@@ -1,0 +1,16 @@
+INFO:     Started server process [529]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8003 (Press CTRL+C to quit)
+INFO:     127.0.0.1:46682 - "GET /api/factories HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46686 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:46700 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:43774 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43784 - "GET /api/compliance-report?factory=erode HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43794 - "GET /api/notifications?factory=karur HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [529]

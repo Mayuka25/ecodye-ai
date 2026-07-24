@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EcoDye AI — Live Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --deep: #065A82;
+    --navy: #21295C;
+    --teal: #1C7293;
+    --mint: #02C39A;
+    --card: #EDF4F7;
+    --ink: #13202B;
+    --muted: #5A6B7A;
+    --safe: #02C39A;
+    --warn: #F4A100;
+    --danger: #E23E3E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: Calibri, Arial, sans-serif; background: #F6FAFC; color: var(--ink);
+  }
+  header {
+    background: var(--navy); color: white; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { margin: 0; font-size: 22px; }
+  header .status { font-size: 13px; color: #9FC6DA; }
+  .status.connected { color: var(--mint); }
+  .container { padding: 22px 28px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  .card {
+    background: white; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .card h2 { margin: 0 0 10px 0; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  canvas { max-height: 180px; }
+  .risk-panel { text-align: center; }
+  .gauge-wrap { position: relative; width: 220px; margin: 0 auto; }
+  .gauge-score { font-size: 40px; font-weight: bold; margin-top: -58px; }
+  .risk-label { font-size: 15px; font-weight: bold; padding: 4px 14px; border-radius: 20px; display: inline-block; color: white; margin-top: 4px; }
+  .badge-safe { background: var(--safe); }
+  .badge-warn { background: var(--warn); }
+  .badge-danger { background: var(--danger); }
+  .alert-banner {
+    background: #FFF4E5; border: 1px solid var(--warn); color: #8a5800; padding: 10px 14px; border-radius: 8px;
+    font-size: 13.5px; margin-bottom: 12px; display: none; text-align: left;
+  }
+  .alert-banner.show { display: block; }
+  .rec-item { padding: 8px 0; border-bottom: 1px solid var(--card); font-size: 13px; }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-item b { color: var(--deep); }
+  .params-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .params-table td { padding: 5px 4px; border-bottom: 1px solid var(--card); }
+  .params-table td:last-child { text-align: right; font-weight: bold; }
+  .over-limit { color: var(--danger); }
+  .log { max-height: 160px; overflow-y: auto; font-size: 12px; }
+  .log-item { padding: 4px 0; border-bottom: 1px solid var(--card); color: var(--muted); }
+  .full-width { grid-column: 1 / -1; }
+  .notif-item {
+    padding: 9px 10px; border-radius: 7px; margin-bottom: 8px; font-size: 12.5px;
+    border-left: 3px solid var(--teal); background: #F6FAFC;
+  }
+  .notif-item.sms { border-left-color: #F4A100; }
+  .notif-item .notif-head { display: flex; justify-content: space-between; font-weight: bold; color: var(--deep); margin-bottom: 3px; }
+  .notif-item .notif-recipient { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+  .notif-item .notif-msg { color: var(--ink); }
+  .notif-empty { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .notif-log { max-height: 220px; overflow-y: auto; }
+
+  /* Factory cluster cards */
+  .cluster-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .factory-card {
+    border: 2px solid var(--card); border-radius: 10px; padding: 12px; cursor: pointer;
+    transition: all 0.15s ease; background: #FBFDFE;
+  }
+  .factory-card:hover { border-color: var(--teal); }
+  .factory-card.selected { border-color: var(--deep); background: #EAF4F8; box-shadow: 0 2px 8px rgba(6,90,130,0.15); }
+  .factory-card .fc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .factory-card .fc-name { font-weight: bold; font-size: 14px; color: var(--ink); }
+  .factory-card .fc-loc { font-size: 11px; color: var(--muted); }
+  .fc-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot-safe { background: var(--safe); box-shadow: 0 0 0 3px rgba(2,195,154,0.2); }
+  .dot-warn { background: var(--warn); box-shadow: 0 0 0 3px rgba(244,161,0,0.2); }
+  .dot-danger { background: var(--danger); box-shadow: 0 0 0 3px rgba(226,62,62,0.2); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(226,62,62,0.4);} 70% { box-shadow: 0 0 0 8px rgba(226,62,62,0);} 100% { box-shadow: 0 0 0 0 rgba(226,62,62,0);} }
+  .fc-score { font-size: 26px; font-weight: bold; }
+  .fc-label { font-size: 11px; color: var(--muted); }
+  .report-btn {
+    display: block; width: 100%; margin-top: 10px; padding: 10px; border: none; border-radius: 8px;
+    background: var(--deep); color: white; font-size: 13px; font-weight: bold; cursor: pointer;
+    text-align: center; text-decoration: none; box-sizing: border-box;
+  }
+  .report-btn:hover { background: var(--navy); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💧 EcoDye AI — Live Cluster Monitoring Dashboard</h1>
+  <div class="status" id="status">Connecting...</div>
+</header>
+
+<div class="container">
+  <div style="display:flex; flex-direction:column; gap:20px;">
+
+    <div class="card full-width">
+      <h2>Industrial Cluster Overview — click a factory to inspect</h2>
+      <div class="cluster-grid" id="cluster-grid"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="chart-title">Live Effluent Parameters</h2>
+      <div class="grid-charts">
+        <div><canvas id="chart-ph"></canvas></div>
+        <div><canvas id="chart-cod"></canvas></div>
+        <div><canvas id="chart-bod"></canvas></div>
+        <div><canvas id="chart-tds"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Current Readings vs. Legal Limits</h2>
+      <table class="params-table" id="params-table"></table>
+    </div>
+
+    <div class="card">
+      <h2>Anomaly / Event Log</h2>
+      <div class="log" id="event-log"></div>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:20px;">
+
+    <div class="card risk-panel">
+      <h2 id="risk-title">Pollution Risk Score</h2>
+      <div class="alert-banner" id="alert-banner"></div>
+      <div class="gauge-wrap">
+        <svg viewBox="0 0 200 120" width="220">
+          <defs>
+            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#02C39A" />
+              <stop offset="50%" stop-color="#F4A100" />
+              <stop offset="100%" stop-color="#E23E3E" />
+            </linearGradient>
+          </defs>
+          <path d="M20,100 A80,80 0 0,1 180,100" stroke="#E8EEF1" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <path id="gauge-arc" d="M20,100 A80,80 0 0,1 180,100" stroke="url(#gaugeGradient)" stroke-width="14" fill="none"
+                stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="251.2" style="transition: stroke-dashoffset 0.6s ease;"/>
+          <line id="gauge-needle" x1="100" y1="100" x2="100" y2="32" stroke="#21295C" stroke-width="4" stroke-linecap="round"
+                style="transform-origin: 100px 100px; transition: transform 0.6s ease;"/>
+          <circle cx="100" cy="100" r="6" fill="#21295C" />
+        </svg>
+      </div>
+      <div class="gauge-score" id="risk-score">--</div>
+      <span class="risk-label badge-safe" id="risk-label">Waiting for data...</span>
+    </div>
+
+    <div class="card">
+      <h2>Treatment Recommendations</h2>
+      <div id="recommendations"></div>
+    </div>
+
+    <div class="card">
+      <h2>Alert Notifications (Email / SMS Simulation)</h2>
+      <div class="notif-log" id="notif-log">
+        <div class="notif-empty">No alerts sent yet — notifications fire automatically when risk reaches Hazardous or an anomaly is detected.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Session Summary</h2>
+      <table class="params-table" id="summary-table"></table>
+      <a class="report-btn" id="report-btn" href="/api/compliance-report/pdf?factory=tiruppur" target="_blank">
+        📄 Download Compliance Report (PDF)
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+const LIMITS = { pH_low: 5.5, pH_high: 9.0, bod: 30, cod: 250, tds: 2100, color_admi: 300, turbidity_ntu: 50, temperature_c: 40 };
+const MAX_POINTS = 30;
+const FACTORIES = [
+  { id: "tiruppur", name: "Tiruppur Unit", location: "Tiruppur, TN" },
+  { id: "erode", name: "Erode Unit", location: "Erode, TN" },
+  { id: "karur", name: "Karur Unit", location: "Karur, TN" },
+];
+let selectedFactory = "tiruppur";
+let counts = {}; // per-factory session counts
+FACTORIES.forEach(f => counts[f.id] = { Safe: 0, 'Needs Treatment': 0, Hazardous: 0, anomalies: 0, total: 0 });
+
+// ---------------- Cluster overview cards ----------------
+function initClusterGrid() {
+  const grid = document.getElementById('cluster-grid');
+  grid.innerHTML = FACTORIES.map(f => `
+    <div class="factory-card ${f.id === selectedFactory ? 'selected' : ''}" id="fc-${f.id}" onclick="selectFactory('${f.id}')">
+      <div class="fc-head">
+        <span class="fc-name">${f.name}</span>
+        <span class="fc-dot dot-safe" id="fc-dot-${f.id}"></span>
+      </div>
+      <div class="fc-loc">${f.location}</div>
+      <div class="fc-score" id="fc-score-${f.id}">--</div>
+      <div class="fc-label" id="fc-label-${f.id}">Waiting for data...</div>
+    </div>
+  `).join('');
+}
+
+function selectFactory(fid) {
+  selectedFactory = fid;
+  document.querySelectorAll('.factory-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('fc-' + fid).classList.add('selected');
+  const f = FACTORIES.find(x => x.id === fid);
+  document.getElementById('chart-title').textContent = `Live Effluent Parameters — ${f.name}`;
+  document.getElementById('risk-title').textContent = `Pollution Risk Score — ${f.name}`;
+  document.getElementById('report-btn').href = `/api/compliance-report/pdf?factory=${fid}`;
+  // reset charts for the newly selected factory
+  [chartPH, chartCOD, chartBOD, chartTDS].forEach(c => { c.data.labels = []; c.data.datasets[0].data = []; c.update('none'); });
+  renderNotifLog(fid);
+  renderSummary(fid);
+}
+
+function updateClusterCard(fid, data) {
+  const dotClass = data.risk_label === 'Safe' ? 'dot-safe' : data.risk_label === 'Needs Treatment' ? 'dot-warn' : 'dot-danger';
+  const dot = document.getElementById('fc-dot-' + fid);
+  dot.className = 'fc-dot ' + dotClass;
+  document.getElementById('fc-score-' + fid).textContent = data.risk_score;
+  document.getElementById('fc-score-' + fid).style.color = data.risk_label === 'Safe' ? '#02C39A' : data.risk_label === 'Needs Treatment' ? '#F4A100' : '#E23E3E';
+  document.getElementById('fc-label-' + fid).textContent = data.risk_label + (data.anomaly ? ' ⚠' : '');
+}
+
+// ---------------- Charts (for selected factory only) ----------------
+function makeChart(ctx, label, color) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + '22', tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
+    options: {
+      responsive: true, animation: false,
+      plugins: { legend: { display: false }, title: { display: true, text: label, font: { size: 12 } } },
+      scales: { x: { display: false }, y: { beginAtZero: false } }
+    }
+  });
+}
+
+const chartPH = makeChart(document.getElementById('chart-ph'), 'pH', '#065A82');
+const chartCOD = makeChart(document.getElementById('chart-cod'), 'COD (mg/L)', '#E23E3E');
+const chartBOD = makeChart(document.getElementById('chart-bod'), 'BOD (mg/L)', '#1C7293');
+const chartTDS = makeChart(document.getElementById('chart-tds'), 'TDS (mg/L)', '#02C39A');
+
+function pushPoint(chart, label, value) {
+  chart.data.labels.push(label);
+  chart.data.datasets[0].data.push(value);
+  if (chart.data.labels.length > MAX_POINTS) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+  }
+  chart.update('none');
+}
+
+function updateParamsTable(reading) {
+  const rows = [
+    ['pH', reading.pH, `${LIMITS.pH_low} - ${LIMITS.pH_high}`, reading.pH < LIMITS.pH_low || reading.pH > LIMITS.pH_high],
+    ['BOD (mg/L)', reading.bod, `≤ ${LIMITS.bod}`, reading.bod > LIMITS.bod],
+    ['COD (mg/L)', reading.cod, `≤ ${LIMITS.cod}`, reading.cod > LIMITS.cod],
+    ['TDS (mg/L)', reading.tds, `≤ ${LIMITS.tds}`, reading.tds > LIMITS.tds],
+    ['Color (ADMI)', reading.color_admi, `≤ ${LIMITS.color_admi}`, reading.color_admi > LIMITS.color_admi],
+    ['Turbidity (NTU)', reading.turbidity_ntu, `≤ ${LIMITS.turbidity_ntu}`, reading.turbidity_ntu > LIMITS.turbidity_ntu],
+    ['Temperature (°C)', reading.temperature_c, `≤ ${LIMITS.temperature_c}`, reading.temperature_c > LIMITS.temperature_c],
+    ['Flow (L/min)', reading.flow_lpm, '—', false],
+  ];
+  document.getElementById('params-table').innerHTML = rows.map(r =>
+    `<tr><td>${r[0]}</td><td>${r[3] ? '<span class="over-limit">' + r[1] + '</span>' : r[1]}</td><td style="text-align:left;color:#5A6B7A;font-weight:normal;">${r[2]}</td></tr>`
+  ).join('');
+}
+
+// ---------------- Gauge ----------------
+function updateGauge(score) {
+  const arcLen = 251.2;
+  const offset = arcLen * (1 - score / 100);
+  document.getElementById('gauge-arc').style.strokeDashoffset = offset;
+  const angle = (score / 100) * 180 - 90;
+  document.getElementById('gauge-needle').style.transform = `rotate(${angle}deg)`;
+}
+
+function updateRisk(data) {
+  const scoreEl = document.getElementById('risk-score');
+  const labelEl = document.getElementById('risk-label');
+  scoreEl.textContent = data.risk_score;
+  labelEl.textContent = data.risk_label + (data.anomaly ? ' ⚠ Anomaly' : '');
+  labelEl.className = 'risk-label ' + (data.risk_label === 'Safe' ? 'badge-safe' : data.risk_label === 'Needs Treatment' ? 'badge-warn' : 'badge-danger');
+  scoreEl.style.color = data.risk_label === 'Safe' ? '#02C39A' : data.risk_label === 'Needs Treatment' ? '#F4A100' : '#E23E3E';
+  updateGauge(data.risk_score);
+
+  const banner = document.getElementById('alert-banner');
+  if (data.predictive_alert) {
+    banner.textContent = '⚠ ' + data.predictive_alert;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+function updateRecommendations(recs) {
+  document.getElementById('recommendations').innerHTML = recs.map(r =>
+    `<div class="rec-item"><b>${r.parameter}:</b> ${r.issue}<br>→ ${r.action}</div>`
+  ).join('');
+}
+
+function updateLog(fid, data) {
+  if (fid !== selectedFactory || !data.anomaly) return;
+  const log = document.getElementById('event-log');
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  const t = new Date(data.timestamp).toLocaleTimeString();
+  item.textContent = `[${t}] Anomaly detected — risk: ${data.risk_label}, score: ${data.risk_score}`;
+  log.prepend(item);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ---------------- Notifications (kept per factory in memory) ----------------
+const notifStore = {};
+FACTORIES.forEach(f => notifStore[f.id] = []);
+
+function updateNotifications(fid, notification) {
+  if (!notification) return;
+  notifStore[fid].unshift(notification);
+  if (notifStore[fid].length > 20) notifStore[fid].pop();
+  if (fid === selectedFactory) renderNotifLog(fid);
+}
+
+function renderNotifLog(fid) {
+  const log = document.getElementById('notif-log');
+  const items = notifStore[fid];
+  if (!items.length) {
+    log.innerHTML = '<div class="notif-empty">No alerts sent yet — notifications fire automatically when risk reaches Hazardous or an anomaly is detected.</div>';
+    return;
+  }
+  log.innerHTML = items.map(n => {
+    const isSms = n.channel === 'SMS';
+    const icon = isSms ? '📱' : '📧';
+    const t = new Date(n.timestamp).toLocaleTimeString();
+    return `<div class="notif-item ${isSms ? 'sms' : ''}">
+      <div class="notif-head"><span>${icon} ${n.channel} sent</span><span>${t}</span></div>
+      <div class="notif-recipient">To: ${n.recipient}</div>
+      <div class="notif-msg">${n.message}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary(fid) {
+  const c = counts[fid];
+  document.getElementById('summary-table').innerHTML = `
+    <tr><td>Total readings</td><td>${c.total}</td></tr>
+    <tr><td>Safe</td><td style="color:#02C39A">${c.Safe}</td></tr>
+    <tr><td>Needs Treatment</td><td style="color:#F4A100">${c['Needs Treatment']}</td></tr>
+    <tr><td>Hazardous</td><td style="color:#E23E3E">${c.Hazardous}</td></tr>
+    <tr><td>Anomalies flagged</td><td>${c.anomalies}</td></tr>
+  `;
+}
+
+// ---------------- WebSocket ----------------
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/live`);
+  const statusEl = document.getElementById('status');
+
+  ws.onopen = () => { statusEl.textContent = '● Live'; statusEl.classList.add('connected'); };
+  ws.onclose = () => { statusEl.textContent = '○ Disconnected — retrying...'; statusEl.classList.remove('connected'); setTimeout(connect, 2000); };
+
+  ws.onmessage = (event) => {
+    const payload = JSON.parse(event.data);
+    const factories = payload.factories;
+
+    Object.keys(factories).forEach(fid => {
+      const data = factories[fid];
+      updateClusterCard(fid, data);
+      updateLog(fid, data);
+      updateNotifications(fid, data.notification);
+
+      const c = counts[fid];
+      c.total++;
+      c[data.risk_label] = (c[data.risk_label] || 0) + 1;
+      if (data.anomaly) c.anomalies++;
+      if (fid === selectedFactory) renderSummary(fid);
+
+      if (fid === selectedFactory) {
+        const t = new Date(data.timestamp).toLocaleTimeString();
+        const r = data.reading;
+        pushPoint(chartPH, t, r.pH);
+        pushPoint(chartCOD, t, r.cod);
+        pushPoint(chartBOD, t, r.bod);
+        pushPoint(chartTDS, t, r.tds);
+        updateParamsTable(r);
+        updateRisk(data);
+        updateRecommendations(data.recommendations);
+      }
+    });
+  };
+}
+
+initClusterGrid();
+connect();
+</script>
+</body>
+</html>
