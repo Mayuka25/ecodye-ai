@@ -16,27 +16,6 @@ real trained ML models into a live dashboard. No physical hardware required to r
 | `data/effluent_history.csv` | Pre-generated training dataset (20,000 readings) |
 | `models/*.joblib` | Pre-trained models — ready to use immediately, no retraining needed |
 
-## How to run it
-
-1. **Install dependencies** (Python 3.9+):
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **(Optional) Regenerate data & retrain models** — not required, pre-trained models are included:
-   ```bash
-   python3 data_simulator.py     # regenerates data/effluent_history.csv
-   python3 train_models.py       # retrains and saves models/*.joblib
-   ```
-
-3. **Start the server**:
-   ```bash
-   uvicorn app:app --host 0.0.0.0 --port 8000
-   ```
-
-4. **Open the dashboard**: go to `http://localhost:8000` in your browser.
-   You'll see live-updating charts, a pollution risk score, predictive alerts, and
-   treatment recommendations, refreshing roughly every 1.2 seconds.
 
 ## API endpoints
 
